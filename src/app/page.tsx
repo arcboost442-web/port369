@@ -73,14 +73,15 @@ function useAllTokens(addresses?: readonly `0x${string}`[]) {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-  if (!client || !addresses) return
-  if (addresses.length === 0) {
-    setTokens([])
-    setLoading(false)
-    return
-  }
-  try {
-      // FIXED: Batch all token reads in parallel, but NO event fetching
+    if (!client || !addresses) return
+    if (addresses.length === 0) {
+      setTokens([])
+      setLoading(false)
+      return
+    }
+
+    // Tahap 1: data cepat (tanpa event, tanpa IPFS)
+    try {
       const results = await Promise.all(
         addresses.map(async (addr) => {
           try {
@@ -93,13 +94,11 @@ function useAllTokens(addresses?: readonly `0x${string}`[]) {
             const reserveN = num((info as any).reservePLS)
             const mc = priceN * TOTAL_SUPPLY
 
-            // FIXED: Resolve IPFS image synchronously from data URI, skip network fetch
             let imgSrc = ''
             const uri = (info as any).metaURI
             if (uri?.startsWith('data:application/json,')) {
               try { imgSrc = ipfsToHttp(JSON.parse(decodeURIComponent(uri.slice(22))).image) } catch {}
             }
-            // FIXED: ipfs:// images resolved lazily by TokenAvatar via useTokenImage hook, not here
 
             return {
               address: addr,
@@ -114,14 +113,42 @@ function useAllTokens(addresses?: readonly `0x${string}`[]) {
               price: priceN,
               marketCap: mc,
               milestone: Number(milestone as bigint),
-              volume: 0, // FIXED: placeholder, loaded on-demand
+              volume: 0,
               imgSrc,
             } as TokenData
           } catch { return null }
         })
       )
-      setTokens(results.filter(Boolean) as TokenData[])
-    } finally {
+      const base = results.filter(Boolean) as TokenData[]
+      setTokens(base)
+      setLoading(false)
+
+      // Tahap 2: volume + gambar IPFS, diisi di belakang layar
+      let head: bigint | null = null
+      try { head = await client.getBlockNumber() } catch {}
+
+      base.forEach(async (t) => {
+        // gambar IPFS
+        if (!t.imgSrc && t.metaURI?.startsWith('ipfs://')) {
+          try {
+            const d = await fetch(IPFS_GW + t.metaURI.slice(7)).then(r => r.json())
+            const img = ipfsToHttp(d.image)
+            setTokens(prev => prev.map(x => x.address === t.address ? { ...x, imgSrc: img } : x))
+          } catch {}
+        }
+        // volume
+        if (head === null) return
+        try {
+          const from = head > BigInt(100000) ? head - BigInt(100000) : BigInt(0)
+          const [buys, sells] = await Promise.all([
+            client.getContractEvents({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, eventName: 'TokensBought', args: { tokenAddr: t.address as `0x${string}` }, fromBlock: from, toBlock: head }),
+            client.getContractEvents({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, eventName: 'TokensSold', args: { tokenAddr: t.address as `0x${string}` }, fromBlock: from, toBlock: head }),
+          ])
+          const volume = [...buys, ...sells].reduce((s, e: any) => s + num(e.args.plsIn ?? e.args.plsOut ?? BigInt(0)), 0)
+          setTokens(prev => prev.map(x => x.address === t.address ? { ...x, volume } : x))
+        } catch {}
+      })
+    } catch {
       setLoading(false)
     }
   }, [addresses, client])
@@ -663,8 +690,7 @@ export default function Home() {
     return () => document.removeEventListener('keydown', handler)
   }, [])
 
-  const { data: totalTokens } = useReadContract({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, functionName: 'totalTokens' })
-const { data: topTokens, error: listError } = useReadContract({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, functionName: 'getTokensPaginated', args: [BigInt(0), BigInt(20)] })
+  const { data: topTokens, error: listError } = useReadContract({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, functionName: 'getTokensPaginated', args: [BigInt(0), BigInt(20)] })
 
 const { tokens, loading: tokensLoading } = useAllTokens(topTokens)
 const loading = tokensLoading && !listError
@@ -728,10 +754,10 @@ const loading = tokensLoading && !listError
              Loading tokens...
           </div>
         ) : listError ? (
-          <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
-            Failed to load tokens: {(listError as any).shortMessage ?? listError.message}
-          </div>
-        ) : tokens.length === 0 ? (
+  <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
+    Failed to load tokens: {(listError as any).shortMessage ?? listError.message}
+  </div>
+) : tokens.length === 0 ? (
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '60px 20px', textAlign: 'center' }}>
             <div style={{ fontSize: 14, color: 'var(--text-faint)', marginBottom: 12 }}>No tokens launched yet</div>
             <a href="/create" style={{ background: 'var(--accent)', color: '#fff', borderRadius: 6, padding: '10px 20px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Launch the first token</a>
