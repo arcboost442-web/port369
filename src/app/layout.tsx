@@ -1,5 +1,3 @@
-'use client'
-
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
@@ -19,14 +17,22 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
+export const metadata: Metadata = {
+  title: 'Port369',
+  description: 'Fair-launch token factory on PulseChain',
+  icons: {
+    icon: '/favicon.svg',
+  },
+}
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-  <html lang="en" suppressHydrationWarning>      
-  <body className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <WagmiProvider config={config}>
           <QueryClientProvider client={queryClient}>
             {children}
