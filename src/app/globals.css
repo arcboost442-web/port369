@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* ─── Design tokens ─────────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
+  --bg-page:        #0C0C0E;
+  --bg-card:        #111114;
+  --bg-nav:         rgba(12,12,14,0.94);
+  --bg-input:       #111114;
+  --bg-dropdown:    #1C1C24;
+  --bg-item-hover:  rgba(255,255,255,0.04);
+  --bg-subtle:      rgba(255,255,255,0.04);
+
+  --border:         rgba(255,255,255,0.055);
+  --border-subtle:  rgba(255,255,255,0.04);
+  --border-strong:  rgba(255,255,255,0.09);
+  --border-hover:   rgba(110,84,245,0.3);
+
+  --text-primary:   #F2F2F5;
+  --text-secondary: #D8D8E8;
+  --text-muted:     #7A7A90;
+  --text-dim:       #4A4A6A;
+  --text-faint:     #3E3E55;
+  --text-icon:      #9A9AB0;
+
+  --accent:         #6E54F5;
+  --accent-bg:      rgba(110,84,245,0.1);
+  --accent-border:  rgba(110,84,245,0.2);
+
+  --danger:         #F0455A;
+  --danger-bg:      rgba(240,69,90,0.1);
+  --danger-hover:   rgba(240,69,90,0.07);
+
+  --green:          #17C974;
+
+  --overlay-dark:   rgba(0,0,0,0.6);
+}
+
+[data-theme="light"] {
+  --bg-page:        #F4F4F8;
+  --bg-card:        #FFFFFF;
+  --bg-nav:         rgba(244,244,248,0.94);
+  --bg-input:       #FFFFFF;
+  --bg-dropdown:    #FFFFFF;
+  --bg-item-hover:  rgba(0,0,0,0.03);
+  --bg-subtle:      rgba(0,0,0,0.03);
+
+  --border:         rgba(0,0,0,0.08);
+  --border-subtle:  rgba(0,0,0,0.05);
+  --border-strong:  rgba(0,0,0,0.12);
+  --border-hover:   rgba(110,84,245,0.35);
+
+  --text-primary:   #111118;
+  --text-secondary: #2A2A3A;
+  --text-muted:     #5A5A78;
+  --text-dim:       #8A8AA8;
+  --text-faint:     #AAAACC;
+  --text-icon:      #6A6A88;
+
+  --accent:         #6E54F5;
+  --accent-bg:      rgba(110,84,245,0.08);
+  --accent-border:  rgba(110,84,245,0.18);
+
+  --danger:         #E53050;
+  --danger-bg:      rgba(229,48,80,0.08);
+  --danger-hover:   rgba(229,48,80,0.05);
+
+  --green:          #12A85E;
+
+  --overlay-dark:   rgba(0,0,0,0.45);
+}
+
+/* ─── Base ───────────────────────────────────────────────────── */
+@theme inline {
+  --color-background: var(--bg-page);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  transition: color-scheme 0.15s;
+}
+
+body {
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: Arial, Helvetica, sans-serif;
+  transition: background 0.2s, color 0.2s;
+}
+
+@keyframes blink   { 0%,100%{opacity:1} 50%{opacity:.3} }
+@keyframes spin    { to{transform:rotate(360deg)} }
