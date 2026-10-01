@@ -1,5 +1,5 @@
 export const BONDING_CURVE_ADDRESS =
-  '0xE0D708D790cA44A47df751C300633BfB6d4C64C3' as const
+  '0x8ec4Eb0554Ccc608B63FC70D95D0a082435Dddb8' as const
 
 export const BONDING_CURVE_ABI = [
       // admin
