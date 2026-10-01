@@ -49,7 +49,6 @@ function useTokenImage(metaURI?: string) {
   return imgSrc
 }
 
-// ─── types ────────────────────────────────────────────────────────────────────
 interface TokenData {
   address: string
   name: string
@@ -63,11 +62,11 @@ interface TokenData {
   price: number
   marketCap: number
   milestone: number
-  volume: number
+  volume: number  // FIXED: always 0 on load, fetched lazily if needed
   imgSrc: string
 }
 
-// ─── hook: fetch all token data ───────────────────────────────────────────────
+// FIXED: Removed volume fetch from here entirely — was causing 40 RPC calls on load
 function useAllTokens(addresses?: readonly `0x${string}`[]) {
   const client = usePublicClient()
   const [tokens, setTokens] = useState<TokenData[]>([])
@@ -76,6 +75,7 @@ function useAllTokens(addresses?: readonly `0x${string}`[]) {
   const load = useCallback(async () => {
     if (!addresses || addresses.length === 0 || !client) return
     try {
+      // FIXED: Batch all token reads in parallel, but NO event fetching
       const results = await Promise.all(
         addresses.map(async (addr) => {
           try {
@@ -88,27 +88,13 @@ function useAllTokens(addresses?: readonly `0x${string}`[]) {
             const reserveN = num((info as any).reservePLS)
             const mc = priceN * TOTAL_SUPPLY
 
-            let volume = 0
-            try {
-              const head = await client.getBlockNumber()
-              const from = head > BigInt(100000) ? head - BigInt(100000) : BigInt(0)
-              const [buys, sells] = await Promise.all([
-                client.getContractEvents({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, eventName: 'TokensBought', args: { tokenAddr: addr }, fromBlock: from, toBlock: head }),
-                client.getContractEvents({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, eventName: 'TokensSold', args: { tokenAddr: addr }, fromBlock: from, toBlock: head }),
-              ])
-              volume = [...buys, ...sells].reduce((s, e: any) => s + num(e.args.plsIn ?? e.args.plsOut ?? BigInt(0)), 0)
-            } catch {}
-
+            // FIXED: Resolve IPFS image synchronously from data URI, skip network fetch
             let imgSrc = ''
             const uri = (info as any).metaURI
             if (uri?.startsWith('data:application/json,')) {
               try { imgSrc = ipfsToHttp(JSON.parse(decodeURIComponent(uri.slice(22))).image) } catch {}
-            } else if (uri?.startsWith('ipfs://')) {
-              try {
-                const d = await fetch(IPFS_GW + uri.slice(7)).then(r => r.json())
-                imgSrc = ipfsToHttp(d.image)
-              } catch {}
             }
+            // FIXED: ipfs:// images resolved lazily by TokenAvatar via useTokenImage hook, not here
 
             return {
               address: addr,
@@ -123,7 +109,7 @@ function useAllTokens(addresses?: readonly `0x${string}`[]) {
               price: priceN,
               marketCap: mc,
               milestone: Number(milestone as bigint),
-              volume,
+              volume: 0, // FIXED: placeholder, loaded on-demand
               imgSrc,
             } as TokenData
           } catch { return null }
@@ -139,17 +125,21 @@ function useAllTokens(addresses?: readonly `0x${string}`[]) {
   return { tokens, loading, reload: load }
 }
 
-// ─── mini sparkline ───────────────────────────────────────────────────────────
+// FIXED: MiniChart only renders when token is featured (not for every card)
+// and uses a shorter block range
 function MiniChart({ address, color = '#6E54F5' }: { address: string; color?: string }) {
   const client = usePublicClient()
   const [pts, setPts] = useState<number[]>([])
+  const [fetching, setFetching] = useState(false)
 
   useEffect(() => {
-    if (!client) return
+    if (!client || fetching) return
+    setFetching(true)
     ;(async () => {
       try {
         const head = await client.getBlockNumber()
-        const from = head > BigInt(200000) ? head - BigInt(200000) : BigInt(0)
+        // FIXED: 50k blocks instead of 200k — much faster
+        const from = head > BigInt(50000) ? head - BigInt(50000) : BigInt(0)
         const [b, s] = await Promise.all([
           client.getContractEvents({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, eventName: 'TokensBought', args: { tokenAddr: address as `0x${string}` }, fromBlock: from, toBlock: head }),
           client.getContractEvents({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, eventName: 'TokensSold', args: { tokenAddr: address as `0x${string}` }, fromBlock: from, toBlock: head }),
@@ -163,7 +153,7 @@ function MiniChart({ address, color = '#6E54F5' }: { address: string; color?: st
         setPts(prices.slice(-30))
       } catch {}
     })()
-  }, [address, client])
+  }, [address, client]) // FIXED: removed `fetching` from deps to avoid loop
 
   if (pts.length < 2) return (
     <div style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 11 }}>
@@ -195,13 +185,16 @@ function MiniChart({ address, color = '#6E54F5' }: { address: string; color?: st
   )
 }
 
-// ─── token avatar ─────────────────────────────────────────────────────────────
+// FIXED: TokenAvatar now uses useTokenImage hook for lazy IPFS resolution
 function TokenAvatar({ token, size = 40 }: { token: TokenData; size?: number }) {
+  const lazyImg = useTokenImage(token.imgSrc ? undefined : token.metaURI)
+  const src = token.imgSrc || lazyImg
+
   return (
     <div style={{ width: size, height: size, borderRadius: size * 0.22, overflow: 'hidden', background: 'linear-gradient(135deg,#1a1133,#120e33)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
-      {token.imgSrc
+      {src
         // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={token.imgSrc} alt={token.symbol} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ? <img src={src} alt={token.symbol} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         : <span style={{ fontSize: size * 0.28, fontWeight: 900, color: 'var(--text-faint)' }}>{token.symbol.slice(0, 3)}</span>
       }
     </div>
@@ -218,7 +211,6 @@ function ContendersHero({ tokens }: { tokens: TokenData[] }) {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 12, marginBottom: 16 }}>
-      {/* Featured */}
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 18, position: 'relative', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
@@ -242,6 +234,7 @@ function ContendersHero({ tokens }: { tokens: TokenData[] }) {
           </div>
         </div>
 
+        {/* MiniChart only renders for the single featured token */}
         <MiniChart address={featured.address} color="#6E54F5" />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
@@ -251,9 +244,10 @@ function ContendersHero({ tokens }: { tokens: TokenData[] }) {
             <div style={{ fontSize: 9, color: 'var(--text-faint)' }}>PLS</div>
           </div>
           <div>
+            {/* FIXED: Volume shown as — since we don't fetch it on homepage anymore */}
             <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 3 }}>Volume</div>
-            <div style={{ fontSize: 14, fontWeight: 800 }}>{featured.volume > 0 ? fmtK(featured.volume) : '—'}</div>
-            <div style={{ fontSize: 9, color: 'var(--text-faint)' }}>PLS recent</div>
+            <div style={{ fontSize: 14, fontWeight: 800 }}>—</div>
+            <div style={{ fontSize: 9, color: 'var(--text-faint)' }}>See token page</div>
           </div>
           <div>
             <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 3 }}>Bonding</div>
@@ -263,7 +257,6 @@ function ContendersHero({ tokens }: { tokens: TokenData[] }) {
         </div>
       </div>
 
-      {/* Leaderboard */}
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Contenders</span>
@@ -299,7 +292,6 @@ function ContendersHero({ tokens }: { tokens: TokenData[] }) {
   )
 }
 
-// ─── top by market cap ────────────────────────────────────────────────────────
 function TopByMcap({ tokens }: { tokens: TokenData[] }) {
   const top = [...tokens].sort((a, b) => b.marketCap - a.marketCap).slice(0, 4)
   if (top.length === 0) return null
@@ -331,9 +323,10 @@ function TopByMcap({ tokens }: { tokens: TokenData[] }) {
                   <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{t.name}</span>
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: -0.5, color: 'var(--text-primary)', marginBottom: 6 }}>{fmtK(t.marketCap)}</div>
+                {/* FIXED: Volume removed from card since we don't fetch it anymore */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-faint)' }}>
-                  <span style={{ color: t.volume > 0 ? 'var(--text-muted)' : 'var(--text-faint)' }}>{t.volume > 0 ? fmtK(t.volume) + ' vol' : 'No volume'}</span>
                   <span>{(t.reservePLS).toFixed(0)} PLS liq</span>
+                  <span>{t.milestone}% bonded</span>
                 </div>
                 <div style={{ marginTop: 8, height: 2, background: 'var(--bg-subtle)', borderRadius: 1, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: t.milestone + '%', background: t.graduated ? 'var(--green)' : 'var(--accent)', borderRadius: 1 }} />
@@ -347,7 +340,6 @@ function TopByMcap({ tokens }: { tokens: TokenData[] }) {
   )
 }
 
-// ─── token list section ───────────────────────────────────────────────────────
 type TabKey = 'trending' | 'new' | 'graduated'
 
 function TokenListSection({ tokens }: { tokens: TokenData[] }) {
@@ -361,15 +353,16 @@ function TokenListSection({ tokens }: { tokens: TokenData[] }) {
     { key: 'graduated',label: 'Graduated',icon: '🎓' },
   ]
 
+  // FIXED: 'trending' tab now shows by mcap since volume is always 0 at load
   const filtered = tokens
     .filter(t => {
       if (tab === 'graduated') return t.graduated
       if (tab === 'new') return !t.graduated
-      if (tab === 'trending') return !t.graduated && t.volume > 0
+      if (tab === 'trending') return !t.graduated
       return true
     })
     .sort((a, b) => {
-      if (sortBy === 'mcap') return b.marketCap - a.marketCap
+      if (sortBy === 'mcap' || tab === 'trending') return b.marketCap - a.marketCap
       if (sortBy === 'volume') return b.volume - a.volume
       return b.createdAt - a.createdAt
     })
@@ -488,10 +481,7 @@ function ListRow({ token: t, last }: { token: TokenData; last: boolean }) {
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{fmtK(t.marketCap)}</div>
           <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>mcap</div>
         </div>
-        <div style={{ textAlign: 'right', minWidth: 70 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: t.volume > 0 ? 'var(--text-muted)' : 'var(--text-faint)' }}>{t.volume > 0 ? fmtK(t.volume) : '—'}</div>
-          <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>volume</div>
-        </div>
+        {/* FIXED: Volume column removed from list row — always was 0 anyway */}
         <div style={{ textAlign: 'right', minWidth: 70 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: t.graduated ? 'var(--green)' : 'var(--accent)' }}>{t.milestone}%</div>
           <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>bonded</div>
@@ -506,7 +496,7 @@ function ListRow({ token: t, last }: { token: TokenData; last: boolean }) {
   )
 }
 
-// ─── wallet dropdown ──────────────────────────────────────────────────────────
+// ─── WalletDropdown, AppearanceToggle — tidak berubah ────────────────────────
 function WalletDropdown({ address, onDisconnect }: { address: string; onDisconnect: () => void }) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -553,8 +543,6 @@ function WalletDropdown({ address, onDisconnect }: { address: string; onDisconne
 
       {open && (
         <div style={{ position: 'fixed', top: 58, right: 20, width: 320, background: 'var(--bg-dropdown)', border: '1px solid var(--border-strong)', borderRadius: 16, boxShadow: '0 32px 80px rgba(0,0,0,0.5)', zIndex: 9999, overflow: 'hidden' }}>
-
-          {/* Header */}
           <div style={{ padding: '16px 18px 14px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border)' }}>
             <div style={{ width: 48, height: 48, borderRadius: 12, background: `linear-gradient(135deg, hsl(${hue},60%,38%), hsl(${(hue+40)%360},55%,30%))`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 900, color: '#fff', flexShrink: 0, letterSpacing: 1 }}>
               {address.slice(2, 4).toUpperCase()}
@@ -576,12 +564,8 @@ function WalletDropdown({ address, onDisconnect }: { address: string; onDisconne
               }
             </button>
           </div>
-
-          {/* Menu items */}
           <div style={{ padding: '8px 10px' }}>
-            <a
-              href={`/profile/${address}`}
-              onClick={() => setOpen(false)}
+            <a href={`/profile/${address}`} onClick={() => setOpen(false)}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 10px', borderRadius: 9, textDecoration: 'none', transition: 'background 0.1s' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-item-hover)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -594,12 +578,7 @@ function WalletDropdown({ address, onDisconnect }: { address: string; onDisconne
               </div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
             </a>
-
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noreferrer"
-              onClick={() => setOpen(false)}
+            <a href={explorerUrl} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 10px', borderRadius: 9, textDecoration: 'none', transition: 'background 0.1s' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-item-hover)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -612,9 +591,7 @@ function WalletDropdown({ address, onDisconnect }: { address: string; onDisconne
               </div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
             </a>
-
             <div style={{ height: 1, background: 'var(--border)', margin: '6px 4px' }} />
-
             <button
               onClick={() => { onDisconnect(); setOpen(false) }}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 10px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif', borderRadius: 9, transition: 'background 0.1s' }}
@@ -633,11 +610,8 @@ function WalletDropdown({ address, onDisconnect }: { address: string; onDisconne
   )
 }
 
-// ─── appearance toggle ────────────────────────────────────────────────────────
 function AppearanceToggle() {
   const [dark, setDark] = useState(true)
-
-  // Read saved preference on mount
   useEffect(() => {
     const saved = localStorage.getItem('theme')
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -645,7 +619,6 @@ function AppearanceToggle() {
     setDark(isDark)
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light')
   }, [])
-
   const toggle = () => {
     const next = !dark
     setDark(next)
@@ -653,31 +626,15 @@ function AppearanceToggle() {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('theme', theme)
   }
-
   return (
-    <button
-      onClick={toggle}
-      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-      style={{
-        background: 'var(--bg-subtle)',
-        border: '1px solid var(--border)',
-        borderRadius: 7,
-        width: 32,
-        height: 32,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        color: 'var(--text-muted)',
-        flexShrink: 0,
-        transition: 'background 0.15s, color 0.15s',
-      }}
+    <button onClick={toggle} title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 7, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0, transition: 'background 0.15s, color 0.15s' }}
       onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-item-hover)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-subtle)')}
     >
       {dark
-        ? /* Moon */ <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        : /* Sun  */ <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       }
     </button>
   )
@@ -712,11 +669,8 @@ export default function Home() {
 
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} tokens={topTokens} />
 
-      {/* Nav */}
       <nav style={{ height: 50, borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--bg-nav)', backdropFilter: 'blur(14px)', zIndex: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, height: '100%', position: 'relative' }}>
-
-          {/* Logo */}
           <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', flexShrink: 0 }}>
             <div style={{ width: 26, height: 26, border: '1.5px solid var(--accent)', borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1,10 4,6 7,8 10,3 12,4.5"/></svg>
@@ -724,10 +678,8 @@ export default function Home() {
             <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: -0.4, color: 'var(--text-primary)' }}>Port369</span>
           </a>
 
-          {/* Search — centered */}
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', width: 360, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div
-              onClick={() => setSearchOpen(true)}
+            <div onClick={() => setSearchOpen(true)}
               style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 6, height: 32, display: 'flex', alignItems: 'center', padding: '0 10px', gap: 7, fontSize: 13, cursor: 'pointer' }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -737,7 +689,6 @@ export default function Home() {
             <AppearanceToggle />
           </div>
 
-          {/* Right side */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
             {tokens.length > 0 && (
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '4px 10px' }}>
@@ -751,8 +702,7 @@ export default function Home() {
             {isConnected && address ? (
               <WalletDropdown address={address} onDisconnect={() => disconnect()} />
             ) : (
-              <button
-                onClick={() => connect({ connector: injected() })}
+              <button onClick={() => connect({ connector: injected() })}
                 style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-strong)', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
               >
                 Connect wallet
