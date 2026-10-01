@@ -73,8 +73,13 @@ function useAllTokens(addresses?: readonly `0x${string}`[]) {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    if (!addresses || addresses.length === 0 || !client) return
-    try {
+  if (!client || !addresses) return
+  if (addresses.length === 0) {
+    setTokens([])
+    setLoading(false)
+    return
+  }
+  try {
       // FIXED: Batch all token reads in parallel, but NO event fetching
       const results = await Promise.all(
         addresses.map(async (addr) => {
@@ -659,9 +664,10 @@ export default function Home() {
   }, [])
 
   const { data: totalTokens } = useReadContract({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, functionName: 'totalTokens' })
-  const { data: topTokens } = useReadContract({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, functionName: 'getTokensPaginated', args: [BigInt(0), BigInt(20)] })
+const { data: topTokens, error: listError } = useReadContract({ address: BONDING_CURVE_ADDRESS, abi: BONDING_CURVE_ABI, functionName: 'getTokensPaginated', args: [BigInt(0), BigInt(20)] })
 
-  const { tokens, loading } = useAllTokens(topTokens)
+const { tokens, loading: tokensLoading } = useAllTokens(topTokens)
+const loading = tokensLoading && !listError
 
   return (
     <main style={{ background: 'var(--bg-page)', minHeight: '100vh', color: 'var(--text-primary)', fontFamily: 'Inter, sans-serif' }}>
@@ -719,7 +725,11 @@ export default function Home() {
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, gap: 10, color: 'var(--text-faint)', fontSize: 13 }}>
             <div style={{ width: 16, height: 16, border: '2px solid var(--accent-bg)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-            Loading tokens...
+             Loading tokens...
+          </div>
+        ) : listError ? (
+          <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
+            Failed to load tokens: {(listError as any).shortMessage ?? listError.message}
           </div>
         ) : tokens.length === 0 ? (
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '60px 20px', textAlign: 'center' }}>
