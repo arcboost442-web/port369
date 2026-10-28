@@ -290,8 +290,7 @@ export default function ClaimPage() {
     if (claimStatus === 'checking') return (
       <div style={statusCard('#3E3E55', 'var(--bg-subtle)', 'var(--border)')}>
         <div style={{ width: 16, height: 16, border: '2px solid var(--accent-bg)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
-        <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>Checking eligibility for <strong style={{ color: 'var(--text-primary)' }}>{address.slice(0, 6)}...{address.slice(-4)}</strong>…</span>
-      </div>
+        <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>Checking eligibility for <strong style={{ color: 'var(--text-primary)' }}>{address?.slice(0, 6)}...{address?.slice(-4)}</strong>…</span>      </div>
     )
 
     if (claimStatus === 'eligible') return (
