@@ -12,17 +12,17 @@ const CLAIM_ABI = [
 ] as const
 
 const CATEGORIES = [
-  { label: 'Early Burners', desc: 'Burned PLS before snapshot' },
-  { label: 'Diamond Hands', desc: 'Held PLS for 6+ months' },
-  { label: 'Whale Wallets', desc: 'Balance ≥ 100M PLS' },
-  { label: 'Liquidity Providers', desc: 'PulseX LP for 30+ days' },
-  { label: 'Sacrifice Participants', desc: 'Participated in PLS sacrifice phase' },
-  { label: 'Builders', desc: 'Deployed contracts on PulseChain' },
-  { label: 'DeFi Users', desc: 'More than 50 DeFi transactions' },
-  { label: 'Port369 Users', desc: 'Traded via bonding curve' },
-  { label: 'Bridge Users', desc: 'Bridged ETH → PLS 3+ times' },
-  { label: 'OG Holders', desc: 'Held PLS since block < 100k' },
-  { label: 'Traders', desc: 'Swap volume > 1M PLS' },
+  { label: 'Early Burners', desc: 'Burned PLS prior to the snapshot' },
+  { label: 'Diamond Hands', desc: 'Held PLS for 6 months or longer' },
+  { label: 'Whale Wallets', desc: 'Maintained a balance of 100M PLS or more' },
+  { label: 'Liquidity Providers', desc: 'Provided liquidity on PulseX for 30+ days' },
+  { label: 'Sacrifice Participants', desc: 'Participated in the PLS sacrifice phase' },
+  { label: 'Builders', desc: 'Deployed smart contracts on PulseChain' },
+  { label: 'DeFi Users', desc: 'Completed more than 50 DeFi transactions' },
+  { label: 'Port369 Users', desc: 'Interacted with the bonding curve' },
+  { label: 'Bridge Users', desc: 'Bridged from Ethereum to PulseChain multiple times' },
+  { label: 'OG Holders', desc: 'Held PLS since the early blocks' },
+  { label: 'High Volume Traders', desc: 'Generated significant swap volume' },
 ]
 
 const FAQ = [
@@ -332,11 +332,14 @@ export default function ClaimPage() {
             CLAIMS OPEN — 29 DAYS REMAINING
           </div>
           <h1 style={{ fontSize: 44, fontWeight: 900, letterSpacing: -1.5, color: 'var(--text-primary)', lineHeight: 1.08, marginBottom: 16 }}>
-            Claim $PORT369<br />
+            $PORT369<br />
             <span style={{ color: 'var(--accent)' }}>Airdrop</span>
           </h1>
-          <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.75, maxWidth: 460, marginBottom: 32 }}>
-            100% of supply distributed to the PulseChain community. No team allocation, no VCs, no insiders. Unclaimed tokens are permanently burned.
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.75, maxWidth: 520, marginBottom: 10 }}>
+            100% of the total supply is allocated to the PulseChain community. No team allocation. No venture capital. No insider distribution.
+          </p>
+          <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.75, maxWidth: 520, marginBottom: 32 }}>
+            Unclaimed tokens will be permanently burned after the claim period ends.
           </p>
 
           {/* Stats */}
@@ -361,7 +364,7 @@ export default function ClaimPage() {
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
               <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--bg-subtle)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--text-muted)' }}>{Icon.wallet}</div>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Connect your wallet to check eligibility</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.65 }}>The system will automatically verify your address against all 15 snapshot categories.</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.65 }}>$PORT369 is distributed entirely through an on-chain airdrop. Eligibility is determined solely by historical activity on PulseChain. There is no whitelist, no private sale, and no preferential allocation.</div>
               <button onClick={() => connect({ connector: injected() })} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 28px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
                 Connect Wallet
               </button>
@@ -385,10 +388,10 @@ export default function ClaimPage() {
           <SectionTitle>How It Works</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(158px, 1fr))', gap: 10 }}>
             {[
-              { n: '01', title: 'Snapshot taken', desc: 'On-chain PulseChain data analyzed at a specific block height.' },
-              { n: '02', title: 'Check eligibility', desc: 'Connect wallet — system verifies against all 15 categories.' },
-              { n: '03', title: 'Claim tokens', desc: 'Approve the transaction — $PORT369 is sent directly to your wallet.' },
-              { n: '04', title: 'Unclaimed burned', desc: 'Tokens not claimed within 30 days are permanently burned.' },
+              { n: '01', title: 'Snapshot', desc: 'On-chain PulseChain data was analyzed at a fixed block height.' },
+              { n: '02', title: 'Eligibility Check', desc: 'Connect your wallet to automatically verify against all eligibility categories.' },
+              { n: '03', title: 'Claim', desc: 'Approve the transaction to receive $PORT369 directly in your wallet.' },
+              { n: '04', title: 'Burn Mechanism', desc: 'Any tokens not claimed within 30 days of TGE will be permanently burned.' },
             ].map(s => (
               <div key={s.n} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px' }}>
                 <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--accent)', fontFamily: 'monospace', marginBottom: 10, letterSpacing: 1 }}>{s.n}</div>
@@ -401,9 +404,9 @@ export default function ClaimPage() {
 
         {/* Categories */}
         <section style={{ marginBottom: 40 }}>
-          <SectionTitle>Eligibility Criteria — 11 Categories</SectionTitle>
+          <SectionTitle>Eligibility Criteria</SectionTitle>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.65 }}>
-            Wallets qualifying for more categories receive a proportionally larger allocation. All data is sourced from on-chain PulseChain records and is publicly verifiable.
+            Eligibility is based on verifiable on-chain activity. Wallets that meet multiple criteria will receive a proportionally higher allocation. All data is publicly auditable.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 8 }}>
             {CATEGORIES.map((cat, i) => (
@@ -431,10 +434,10 @@ export default function ClaimPage() {
               { label: 'Symbol', value: '$PORT369' },
               { label: 'Network', value: 'PulseChain' },
               { label: 'Total Supply', value: '1,000,000,000' },
-              { label: 'Airdrop Allocation', value: '100% — 1,000,000,000 tokens' },
-              { label: 'Team / VC', value: '0%' },
-              { label: 'Contract Address', value: 'TBA — announced at TGE', mono: true },
-              { label: 'Claim Window', value: '30 days after TGE' },
+              { label: 'Community Allocation', value: '100%' },
+              { label: 'Team / Investor Allocation', value: '0%' },
+              { label: 'Contract Address', value: 'To be announced at TGE', mono: true },
+              { label: 'Claim Period', value: '30 days following TGE' },
               { label: 'Unclaimed Tokens', value: 'Permanently burned after deadline' },
             ].map((row, i, arr) => (
               <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none', gap: 12 }}>
@@ -453,11 +456,32 @@ export default function ClaimPage() {
           </div>
         </section>
 
+        {/* Security Notice */}
+        <section style={{ marginBottom: 40 }}>
+          <SectionTitle>Security Notice</SectionTitle>
+          <div style={{ background: 'rgba(240,69,90,0.05)', border: '1px solid rgba(240,69,90,0.18)', borderRadius: 12, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, color: 'var(--danger)' }}>
+              <span style={{ display: 'flex' }}>{Icon.warning}</span>
+              Official domain: <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--text-primary)', marginLeft: 2 }}>port369.com</span>
+            </div>
+            {[
+              'We will never contact you first via direct message.',
+              'Never connect your wallet or enter your seed phrase on any other website.',
+              'Always verify the URL before interacting.',
+            ].map((line, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                <span style={{ color: 'var(--danger)', display: 'flex', marginTop: 1, flexShrink: 0 }}>{Icon.chevronRight}</span>
+                {line}
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* CTA */}
         <div style={{ background: 'linear-gradient(135deg, rgba(110,84,245,0.08) 0%, rgba(110,84,245,0.03) 100%)', border: '1px solid var(--accent-border)', borderRadius: 14, padding: '28px 28px', textAlign: 'center' }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: -0.3 }}>Do not miss the claim window</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: -0.3 }}>Connect your wallet to check eligibility and claim your allocation.</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 22, lineHeight: 1.7 }}>
-            Tokens not claimed within 30 days of TGE are burned permanently. There is no second distribution.
+            Tokens that remain unclaimed after 30 days will be burned permanently.
           </div>
           {!connected
             ? <button onClick={() => connect({ connector: injected() })} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 28px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>Connect &amp; Check Eligibility</button>
