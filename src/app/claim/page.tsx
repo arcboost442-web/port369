@@ -4,138 +4,97 @@ import { useEffect, useState, useCallback } from 'react'
 import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 
-// ─── Ganti dengan contract address + ABI setelah deploy ──────────────────────
 const CLAIM_CONTRACT = '0x0000000000000000000000000000000000000000' as `0x${string}`
 const CLAIM_ABI = [
-  {
-    name: 'claim',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [],
-    outputs: [],
-  },
-  {
-    name: 'hasClaimed',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'wallet', type: 'address' }],
-    outputs: [{ name: '', type: 'bool' }],
-  },
-  {
-    name: 'claimableAmount',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'wallet', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
+  { name: 'claim', type: 'function', stateMutability: 'nonpayable', inputs: [], outputs: [] },
+  { name: 'hasClaimed', type: 'function', stateMutability: 'view', inputs: [{ name: 'wallet', type: 'address' }], outputs: [{ name: '', type: 'bool' }] },
+  { name: 'claimableAmount', type: 'function', stateMutability: 'view', inputs: [{ name: 'wallet', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] },
 ] as const
 
-// ─── Kategori airdrop — 15 kategori ──────────────────────────────────────────
 const CATEGORIES = [
-  { icon: '🔥', label: 'Early Burners', desc: 'Burned PLS before snapshot' },
-  { icon: '💎', label: 'Diamond Hands', desc: 'Held PLS ≥ 6 bulan' },
-  { icon: '🐋', label: 'Whale Wallets', desc: 'Balance ≥ 1M PLS' },
-  { icon: '🌊', label: 'Liquidity Providers', desc: 'LP PulseX ≥ 30 hari' },
-  { icon: '⚡', label: 'Sacrifice Participants', desc: 'PLS sacrifice phase' },
-  { icon: '🏗️', label: 'Builders', desc: 'Deploy contract di PulseChain' },
-  { icon: '📊', label: 'DeFi Users', desc: '>50 transaksi DeFi' },
-  { icon: '🎯', label: 'Port369 Users', desc: 'Beli/jual via bonding curve' },
-  { icon: '🤝', label: 'Community Members', desc: 'Aktif di Discord/Telegram' },
-  { icon: '🗳️', label: 'Governance Voters', desc: 'Vote di proposal PulseChain' },
-  { icon: '🔗', label: 'Bridge Users', desc: 'Bridge ETH → PLS ≥ 3x' },
-  { icon: '🎲', label: 'OG Holders', desc: 'Hold PLS sejak block < 100k' },
-  { icon: '🌱', label: 'Ecosystem Supporters', desc: 'Interaksi ≥ 10 protokol' },
-  { icon: '📈', label: 'Traders', desc: 'Volume swap > 10k PLS' },
-  { icon: '🛡️', label: 'Stakers', desc: 'Stake PLS ≥ 90 hari' },
+  { label: 'Early Burners', desc: 'Burned PLS before snapshot' },
+  { label: 'Diamond Hands', desc: 'Held PLS for 6+ months' },
+  { label: 'Whale Wallets', desc: 'Balance ≥ 1M PLS' },
+  { label: 'Liquidity Providers', desc: 'PulseX LP for 30+ days' },
+  { label: 'Sacrifice Participants', desc: 'Participated in PLS sacrifice phase' },
+  { label: 'Builders', desc: 'Deployed contracts on PulseChain' },
+  { label: 'DeFi Users', desc: 'More than 50 DeFi transactions' },
+  { label: 'Port369 Users', desc: 'Traded via bonding curve' },
+  { label: 'Community Members', desc: 'Active on Discord / Telegram' },
+  { label: 'Governance Voters', desc: 'Voted on PulseChain proposals' },
+  { label: 'Bridge Users', desc: 'Bridged ETH → PLS 3+ times' },
+  { label: 'OG Holders', desc: 'Held PLS since block < 100k' },
+  { label: 'Ecosystem Supporters', desc: 'Interacted with 10+ protocols' },
+  { label: 'Traders', desc: 'Swap volume > 10k PLS' },
+  { label: 'Stakers', desc: 'Staked PLS for 90+ days' },
 ]
 
 const FAQ = [
-  {
-    q: 'Apa itu $PORT369?',
-    a: '$PORT369 adalah token fair-launch di PulseChain dengan mekanisme burn unik. 100% supply didistribusikan ke komunitas — tidak ada alokasi tim, VC, atau insider.'
-  },
-  {
-    q: 'Bagaimana cara claim?',
-    a: 'Connect wallet PulseChain kamu, sistem otomatis cek eligibility berdasarkan 15 kategori snapshot. Kalau eligible, tombol Claim akan aktif.'
-  },
-  {
-    q: 'Kapan deadline claim?',
-    a: 'Claim window terbuka 30 hari setelah TGE. Token yang tidak diklaim akan di-burn permanen.'
-  },
-  {
-    q: 'Berapa yang akan saya dapat?',
-    a: 'Jumlah tergantung kategori eligibility dan tier kamu. Wallet yang masuk lebih banyak kategori mendapat alokasi lebih besar.'
-  },
-  {
-    q: 'Apakah ada biaya untuk claim?',
-    a: 'Tidak ada biaya claim. Kamu hanya perlu bayar gas PLS untuk transaksi on-chain.'
-  },
-  {
-    q: 'Bagaimana dengan mekanisme burn?',
-    a: 'Setiap transaksi $PORT369 membakar sebagian supply. Token yang tidak diklaim juga di-burn — deflasi otomatis dari hari pertama.'
-  },
-  {
-    q: 'Bagaimana cara tahu kalau ada scam?',
-    a: 'HANYA port369.com yang resmi. Kami tidak pernah DM duluan, tidak ada presale, tidak ada fee tersembunyi. Selalu verify contract address di halaman ini.'
-  },
+  { q: 'What is $PORT369?', a: '$PORT369 is a fair-launch token on PulseChain with a unique burn mechanism. 100% of the supply is distributed to the community — no team allocation, no VC, no insiders.' },
+  { q: 'How do I claim?', a: 'Connect your PulseChain wallet. The system automatically checks eligibility against 15 snapshot categories. If eligible, the Claim button will activate.' },
+  { q: 'When does the claim window close?', a: 'The claim window is open for 30 days after TGE. Tokens that are not claimed will be permanently burned.' },
+  { q: 'How much will I receive?', a: 'The amount depends on which eligibility categories your wallet qualifies for. Wallets that meet more categories receive a larger allocation.' },
+  { q: 'Is there a fee to claim?', a: 'There is no claim fee. You only need PLS to cover the on-chain transaction gas cost.' },
+  { q: 'How does the burn mechanism work?', a: 'A portion of every $PORT369 transaction is burned automatically. Unclaimed tokens after the deadline are also permanently burned, creating deflationary pressure from day one.' },
+  { q: 'How do I verify there is no scam?', a: 'Only port369.com is official. We never DM first, there is no presale, and there are no hidden fees. Always verify the contract address on this page before interacting.' },
 ]
 
-// ─── Wallet button / dropdown ringkas (reuse pola dari WalletDropdown) ────────
+// ── SVG icon set ──────────────────────────────────────────────────────────────
+const Icon = {
+  warning: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  check: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  x: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  chevronDown: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>,
+  chevronRight: <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>,
+  wallet: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>,
+  disconnect: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  moon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+  sun: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
+  externalLink: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+  grid: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>,
+  flame: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3z"/></svg>,
+}
+
+// ── Category icon (index-based, clean geometric SVG) ──────────────────────────
+function CategoryIcon({ index }: { index: number }) {
+  const icons = [
+    <svg key={0} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3z"/></svg>,
+    <svg key={1} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+    <svg key={2} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>,
+    <svg key={3} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+    <svg key={4} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+    <svg key={5} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
+    <svg key={6} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+    <svg key={7} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+    <svg key={8} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+    <svg key={9} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>,
+    <svg key={10} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+    <svg key={11} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
+    <svg key={12} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+    <svg key={13} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+    <svg key={14} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>,
+  ]
+  return icons[index % icons.length]
+}
+
+// ── Wallet button ─────────────────────────────────────────────────────────────
 function WalletButton({ address, onDisconnect }: { address: string; onDisconnect: () => void }) {
   const [open, setOpen] = useState(false)
   const shortAddr = address.slice(0, 6) + '...' + address.slice(-4)
   const hue = parseInt(address.slice(2, 6), 16) % 360
-
   return (
     <div style={{ position: 'relative' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 7,
-          background: open ? 'var(--accent-bg)' : 'var(--bg-subtle)',
-          border: `1px solid ${open ? 'rgba(110,84,245,0.4)' : 'var(--border-strong)'}`,
-          borderRadius: 8, padding: '4px 10px 4px 5px',
-          cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-        }}
-      >
-        <div style={{
-          width: 28, height: 28, borderRadius: 7,
-          background: `hsl(${hue},60%,42%)`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 11, fontWeight: 800, color: '#fff',
-        }}>
-          {address.slice(2, 4).toUpperCase()}
-        </div>
+      <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 7, background: open ? 'var(--accent-bg)' : 'var(--bg-subtle)', border: `1px solid ${open ? 'rgba(110,84,245,0.4)' : 'var(--border-strong)'}`, borderRadius: 8, padding: '4px 10px 4px 5px', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
+        <div style={{ width: 28, height: 28, borderRadius: 7, background: `hsl(${hue},60%,42%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#fff' }}>{address.slice(2, 4).toUpperCase()}</div>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{shortAddr}</span>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="2.5" strokeLinecap="round"
-          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
+        <span style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-faint)', display: 'flex' }}>{Icon.chevronDown}</span>
       </button>
       {open && (
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 998 }} />
-          <div style={{
-            position: 'absolute', top: 44, right: 0, width: 200,
-            background: 'var(--bg-dropdown)', border: '1px solid var(--border-strong)',
-            borderRadius: 10, boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
-            zIndex: 999, overflow: 'hidden', padding: 6,
-          }}>
-            <button
-              onClick={() => { onDisconnect(); setOpen(false) }}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                padding: '9px 10px', background: 'none', border: 'none',
-                cursor: 'pointer', borderRadius: 7, fontFamily: 'Inter, sans-serif',
-                color: 'var(--danger)', fontSize: 13, fontWeight: 600,
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--danger-bg)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-              Disconnect
+          <div style={{ position: 'absolute', top: 44, right: 0, width: 190, background: 'var(--bg-dropdown)', border: '1px solid var(--border-strong)', borderRadius: 10, boxShadow: '0 12px 40px rgba(0,0,0,0.4)', zIndex: 999, padding: 6 }}>
+            <button onClick={() => { onDisconnect(); setOpen(false) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 7, fontFamily: 'Inter, sans-serif', color: 'var(--danger)', fontSize: 13, fontWeight: 600 }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--danger-bg)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <span style={{ color: 'var(--danger)' }}>{Icon.disconnect}</span> Disconnect
             </button>
           </div>
         </>
@@ -144,7 +103,7 @@ function WalletButton({ address, onDisconnect }: { address: string; onDisconnect
   )
 }
 
-// ─── Theme toggle (identik dengan homepage) ────────────────────────────────────
+// ── Theme toggle ──────────────────────────────────────────────────────────────
 function ThemeToggle() {
   const [dark, setDark] = useState(true)
   useEffect(() => {
@@ -155,72 +114,46 @@ function ThemeToggle() {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light')
   }, [])
   const toggle = () => {
-    const next = !dark
-    setDark(next)
+    const next = !dark; setDark(next)
     document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light')
     localStorage.setItem('theme', next ? 'dark' : 'light')
   }
   return (
-    <button onClick={toggle} title={dark ? 'Light mode' : 'Dark mode'}
-      style={{
-        background: 'var(--bg-subtle)', border: '1px solid var(--border)',
-        borderRadius: 7, width: 32, height: 32,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0,
-      }}
-      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-item-hover)')}
-      onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-subtle)')}
-    >
-      {dark
-        ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-      }
+    <button onClick={toggle} style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 7, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-item-hover)')} onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-subtle)')}>
+      {dark ? Icon.moon : Icon.sun}
     </button>
   )
 }
 
-// ─── FAQ item ──────────────────────────────────────────────────────────────────
+// ── FAQ item ──────────────────────────────────────────────────────────────────
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false)
   return (
-    <div style={{
-      border: '1px solid var(--border)', borderRadius: 10,
-      overflow: 'hidden', transition: 'border-color 0.15s',
-    }}
-      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-hover)')}
-      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-    >
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 18px', background: 'none', border: 'none',
-          cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif',
-        }}
-      >
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{q}</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)"
-          strokeWidth="2.5" strokeLinecap="round"
-          style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
+    <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }} onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-hover)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
+      <button onClick={() => setOpen(o => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{q}</span>
+        <span style={{ color: 'var(--text-muted)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'flex', flexShrink: 0 }}>{Icon.chevronDown}</span>
       </button>
-      {open && (
-        <div style={{
-          padding: '0 18px 14px',
-          fontSize: 13, lineHeight: 1.7,
-          color: 'var(--text-muted)',
-          borderTop: '1px solid var(--border-subtle)',
-          paddingTop: 12,
-        }}>
-          {a}
-        </div>
-      )}
+      {open && <div style={{ padding: '0 18px 14px', paddingTop: 12, fontSize: 13, lineHeight: 1.7, color: 'var(--text-muted)', borderTop: '1px solid var(--border-subtle)' }}>{a}</div>}
     </div>
   )
 }
 
-// ─── Main page ─────────────────────────────────────────────────────────────────
+// ── Section title ─────────────────────────────────────────────────────────────
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: -0.3, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ width: 3, height: 14, background: 'var(--accent)', borderRadius: 2 }} />
+      {children}
+    </div>
+  )
+}
+
+function statusCard(bg: string, border: string) {
+  return { display: 'flex' as const, alignItems: 'center' as const, gap: 14, padding: '16px 18px', background: bg, border: `1px solid ${border}`, borderRadius: 10, flexWrap: 'wrap' as const }
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function ClaimPage() {
   const { address, isConnected } = useAccount()
   const { connect } = useConnect()
@@ -229,34 +162,27 @@ export default function ClaimPage() {
   useEffect(() => setMounted(true), [])
   const connected = mounted && isConnected
 
-  // Claim state machine
   type ClaimStatus = 'idle' | 'checking' | 'eligible' | 'not-eligible' | 'already-claimed' | 'claiming' | 'claimed' | 'error'
   const [claimStatus, setClaimStatus] = useState<ClaimStatus>('idle')
-  const [claimAmount, setClaimAmount] = useState<string>('')
+  const [claimAmount, setClaimAmount] = useState('')
   const [claimedCategories, setClaimedCategories] = useState<number[]>([])
   const [errorMsg, setErrorMsg] = useState('')
 
   const { writeContract, data: txHash, isPending: isTxPending, error: txError } = useWriteContract()
   const { isSuccess: txConfirmed, isLoading: txConfirming } = useWaitForTransactionReceipt({ hash: txHash })
 
-  // Simulate eligibility check (ganti dengan readContract setelah contract deploy)
   const checkEligibility = useCallback(async () => {
     if (!address) return
     setClaimStatus('checking')
     setClaimedCategories([])
-
-    await new Promise(r => setTimeout(r, 1400)) // simulasi RPC
-
-    // TODO: ganti dengan actual contract call:
+    await new Promise(r => setTimeout(r, 1400))
+    // TODO: replace with actual contract call after deploy
     // const claimed = await readContract({ address: CLAIM_CONTRACT, abi: CLAIM_ABI, functionName: 'hasClaimed', args: [address] })
     // const amount = await readContract({ address: CLAIM_CONTRACT, abi: CLAIM_ABI, functionName: 'claimableAmount', args: [address] })
-    // Demo: eligible kalau address ends dengan digit genap
-    const lastChar = address.slice(-1)
-    const isEligible = parseInt(lastChar, 16) % 2 === 0
-
+    const isEligible = parseInt(address.slice(-1), 16) % 2 === 0
     if (isEligible) {
-      const mockCategories = [0, 2, 6].filter(() => Math.random() > 0.4)
-      setClaimedCategories(mockCategories.length ? mockCategories : [0])
+      const cats = [0, 2, 6].filter(() => Math.random() > 0.4)
+      setClaimedCategories(cats.length ? cats : [0])
       setClaimAmount('24,500')
       setClaimStatus('eligible')
     } else {
@@ -264,14 +190,10 @@ export default function ClaimPage() {
     }
   }, [address])
 
-  // Handle wallet connect → auto check
   useEffect(() => {
-    if (connected && address && claimStatus === 'idle') {
-      checkEligibility()
-    }
+    if (connected && address && claimStatus === 'idle') checkEligibility()
   }, [connected, address, claimStatus, checkEligibility])
 
-  // Handle tx confirmed
   useEffect(() => {
     if (txConfirmed) setClaimStatus('claimed')
     if (txError) { setClaimStatus('error'); setErrorMsg(txError.message?.slice(0, 120) ?? 'Transaction failed') }
@@ -283,101 +205,82 @@ export default function ClaimPage() {
     writeContract({ address: CLAIM_CONTRACT, abi: CLAIM_ABI, functionName: 'claim' })
   }
 
-  // ─── Render helpers ──────────────────────────────────────────────────────────
   const statusBox = () => {
     if (!connected) return null
 
     if (claimStatus === 'checking') return (
-      <div style={statusCard('#3E3E55', 'var(--bg-subtle)', 'var(--border)')}>
+      <div style={statusCard('var(--bg-subtle)', 'var(--border)')}>
         <div style={{ width: 16, height: 16, border: '2px solid var(--accent-bg)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
-        <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>Checking eligibility for <strong style={{ color: 'var(--text-primary)' }}>{address?.slice(0, 6)}...{address?.slice(-4)}</strong>…</span>      </div>
+        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Verifying <span style={{ color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: 12 }}>{address?.slice(0, 6)}...{address?.slice(-4)}</span> against snapshot data…</span>
+      </div>
     )
 
     if (claimStatus === 'eligible') return (
-      <div style={statusCard('var(--green)', 'rgba(23,201,116,0.06)', 'rgba(23,201,116,0.2)')}>
-        <div style={{ fontSize: 22 }}>✅</div>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
-            Wallet eligible — <span style={{ color: 'var(--green)' }}>{claimAmount} $PORT369</span>
+      <div style={statusCard('rgba(23,201,116,0.05)', 'rgba(23,201,116,0.2)')}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(23,201,116,0.12)', border: '1px solid rgba(23,201,116,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#17C974', flexShrink: 0 }}>{Icon.check}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>
+            Eligible — <span style={{ color: '#17C974' }}>{claimAmount} $PORT369</span>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {claimedCategories.length} kategori terpenuhi: {claimedCategories.map(i => CATEGORIES[i].label).join(', ')}
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {claimedCategories.length} {claimedCategories.length === 1 ? 'category' : 'categories'} matched: {claimedCategories.map(i => CATEGORIES[i].label).join(', ')}
           </div>
         </div>
-        <button onClick={handleClaim}
-          disabled={isTxPending || txConfirming}
-          style={{
-            marginLeft: 'auto', background: 'var(--green)', color: '#fff',
-            border: 'none', borderRadius: 8, padding: '10px 22px',
-            fontSize: 13, fontWeight: 700, cursor: 'pointer',
-            opacity: isTxPending || txConfirming ? 0.6 : 1,
-            fontFamily: 'Inter, sans-serif', flexShrink: 0,
-          }}
-        >
-          {isTxPending || txConfirming ? 'Confirming…' : 'Claim Now'}
+        <button onClick={handleClaim} disabled={isTxPending || txConfirming}
+          style={{ background: '#17C974', color: '#000', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: isTxPending || txConfirming ? 0.6 : 1, fontFamily: 'Inter, sans-serif', flexShrink: 0 }}>
+          {isTxPending || txConfirming ? 'Confirming…' : 'Claim'}
         </button>
       </div>
     )
 
     if (claimStatus === 'not-eligible') return (
-      <div style={statusCard('var(--text-dim)', 'var(--bg-subtle)', 'var(--border)')}>
-        <div style={{ fontSize: 22 }}>❌</div>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Wallet tidak eligible</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Alamat ini tidak memenuhi syarat snapshot manapun.</div>
+      <div style={statusCard('var(--bg-subtle)', 'var(--border)')}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', flexShrink: 0 }}>{Icon.x}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>Not eligible</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>This address did not qualify for any snapshot category.</div>
         </div>
         <button onClick={checkEligibility}
-          style={{
-            marginLeft: 'auto', background: 'var(--bg-card)', color: 'var(--text-muted)',
-            border: '1px solid var(--border)', borderRadius: 8, padding: '9px 16px',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter, sans-serif', flexShrink: 0,
-          }}
-        >
-          Coba wallet lain
+          style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter, sans-serif', flexShrink: 0 }}>
+          Try another wallet
         </button>
       </div>
     )
 
     if (claimStatus === 'already-claimed') return (
-      <div style={statusCard('var(--accent)', 'var(--accent-bg)', 'var(--accent-border)')}>
-        <div style={{ fontSize: 22 }}>🎉</div>
+      <div style={statusCard('var(--accent-bg)', 'var(--accent-border)')}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', flexShrink: 0 }}>{Icon.check}</div>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Sudah diklaim!</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Wallet ini sudah berhasil claim $PORT369.</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>Already claimed</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>This wallet has already successfully claimed $PORT369.</div>
         </div>
       </div>
     )
 
     if (claimStatus === 'claimed') return (
-      <div style={statusCard('var(--green)', 'rgba(23,201,116,0.06)', 'rgba(23,201,116,0.25)')}>
-        <div style={{ fontSize: 28 }}>🎉</div>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>Claim berhasil!</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {claimAmount} $PORT369 sudah masuk ke wallet kamu.{' '}
-            {txHash && (
-              <a href={`https://scan.pulsechain.com/tx/${txHash}`} target="_blank" rel="noreferrer"
-                style={{ color: 'var(--accent)', fontWeight: 600 }}>Lihat di explorer →</a>
-            )}
+      <div style={statusCard('rgba(23,201,116,0.05)', 'rgba(23,201,116,0.25)')}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(23,201,116,0.12)', border: '1px solid rgba(23,201,116,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#17C974', flexShrink: 0 }}>{Icon.check}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>Claim successful</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {claimAmount} $PORT369 sent to your wallet.{' '}
+            {txHash && <a href={`https://scan.pulsechain.com/tx/${txHash}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>View on explorer {Icon.externalLink}</a>}
           </div>
         </div>
       </div>
     )
 
     if (claimStatus === 'error') return (
-      <div style={statusCard('var(--danger)', 'var(--danger-bg)', 'rgba(240,69,90,0.25)')}>
-        <div style={{ fontSize: 22 }}>⚠️</div>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Transaksi gagal</div>
+      <div style={statusCard('var(--danger-bg)', 'rgba(240,69,90,0.25)')}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--danger-bg)', border: '1px solid rgba(240,69,90,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)', flexShrink: 0 }}>{Icon.warning}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>Transaction failed</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{errorMsg}</div>
         </div>
         <button onClick={() => setClaimStatus('eligible')}
-          style={{
-            marginLeft: 'auto', background: 'var(--danger)', color: '#fff',
-            border: 'none', borderRadius: 8, padding: '9px 16px',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter, sans-serif', flexShrink: 0,
-          }}
-        >Coba lagi</button>
+          style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter, sans-serif', flexShrink: 0 }}>
+          Retry
+        </button>
       </div>
     )
 
@@ -386,206 +289,132 @@ export default function ClaimPage() {
 
   return (
     <main style={{ background: 'var(--bg-page)', minHeight: '100vh', color: 'var(--text-primary)', fontFamily: 'Inter, sans-serif' }}>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-      `}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}} @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
-      {/* ── Scam warning banner ──────────────────────────────────────────────── */}
-      <div style={{
-        background: 'rgba(240,69,90,0.12)', borderBottom: '1px solid rgba(240,69,90,0.25)',
-        padding: '8px 20px', textAlign: 'center',
-        fontSize: 12, fontWeight: 600, color: 'var(--danger)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-      }}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-        ⚠️ Hanya <strong style={{ color: '#fff' }}>port369.com</strong> yang resmi. Kami tidak pernah DM, tidak ada presale, tidak ada fee tersembunyi.
+      {/* Security notice */}
+      <div style={{ background: 'rgba(240,69,90,0.1)', borderBottom: '1px solid rgba(240,69,90,0.2)', padding: '7px 20px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        <span style={{ color: 'var(--danger)', display: 'flex' }}>{Icon.warning}</span>
+        Official site only: <strong style={{ color: 'var(--text-secondary)', marginLeft: 4 }}>port369.com</strong>
+        <span style={{ color: 'var(--text-dim)', margin: '0 8px' }}>—</span>
+        We never DM first. No presale. No hidden fees.
       </div>
 
-      {/* ── Navbar ───────────────────────────────────────────────────────────── */}
-      <nav style={{
-        height: 50, borderBottom: '1px solid var(--border)',
-        position: 'sticky', top: 0, background: 'var(--bg-nav)',
-        backdropFilter: 'blur(14px)', zIndex: 100,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, height: '100%', position: 'relative' }}>
+      {/* Navbar */}
+      <nav style={{ height: 50, borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--bg-nav)', backdropFilter: 'blur(14px)', zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '0 20px', gap: 10, height: '100%' }}>
           <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', flexShrink: 0 }}>
             <div style={{ width: 26, height: 26, border: '1.5px solid var(--accent)', borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="1,10 4,6 7,8 10,3 12,4.5"/>
-              </svg>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1,10 4,6 7,8 10,3 12,4.5"/></svg>
             </div>
             <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: -0.4, color: 'var(--text-primary)' }}>Port369</span>
           </a>
-
-          {/* Breadcrumb */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-dim)' }}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Claim</span>
-          </div>
+          <span style={{ color: 'var(--text-dim)', display: 'flex' }}>{Icon.chevronRight}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Claim</span>
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 20, padding: '4px 10px' }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#F5A623', display: 'inline-block', animation: 'blink 2s infinite' }}></span>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#F5A623', display: 'inline-block', animation: 'blink 2s infinite' }} />
               PulseChain
             </div>
             <ThemeToggle />
             {connected && address
               ? <WalletButton address={address} onDisconnect={() => { disconnect(); setClaimStatus('idle') }} />
-              : (
-                <button onClick={() => connect({ connector: injected() })}
-                  style={{
-                    background: 'var(--accent)', color: '#fff', border: 'none',
-                    borderRadius: 6, padding: '6px 14px', fontSize: 12,
-                    fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-                  }}
-                >
-                  Connect wallet
-                </button>
-              )
+              : <button onClick={() => connect({ connector: injected() })} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>Connect Wallet</button>
             }
           </div>
         </div>
       </nav>
 
-      {/* ── Content ──────────────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: '48px 20px 80px', animation: 'fadeUp 0.35s ease' }}>
+      <div style={{ maxWidth: 760, margin: '0 auto', padding: '52px 20px 80px', animation: 'fadeUp 0.3s ease' }}>
 
         {/* Hero */}
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: 'rgba(23,201,116,0.1)', border: '1px solid rgba(23,201,116,0.25)',
-            borderRadius: 20, padding: '5px 14px', marginBottom: 20,
-            fontSize: 11, fontWeight: 700, color: '#17C974',
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#17C974', display: 'inline-block', animation: 'blink 2s infinite' }}></span>
-            CLAIMS OPEN — 29 hari lagi
+        <div style={{ marginBottom: 44 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(23,201,116,0.08)', border: '1px solid rgba(23,201,116,0.2)', borderRadius: 20, padding: '5px 14px', marginBottom: 22, fontSize: 11, fontWeight: 700, color: '#17C974', letterSpacing: 0.3 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#17C974', display: 'inline-block', animation: 'blink 2s infinite' }} />
+            CLAIMS OPEN — 29 DAYS REMAINING
           </div>
-          <h1 style={{
-            fontSize: 42, fontWeight: 900, letterSpacing: -1.5,
-            color: 'var(--text-primary)', lineHeight: 1.1, marginBottom: 14,
-          }}>
+          <h1 style={{ fontSize: 44, fontWeight: 900, letterSpacing: -1.5, color: 'var(--text-primary)', lineHeight: 1.08, marginBottom: 16 }}>
             Claim $PORT369<br />
             <span style={{ color: 'var(--accent)' }}>Airdrop</span>
           </h1>
-          <p style={{ fontSize: 15, color: 'var(--text-muted)', lineHeight: 1.7, maxWidth: 480, margin: '0 auto', marginBottom: 32 }}>
-            100% supply didistribusikan ke komunitas PulseChain. Tidak ada tim, tidak ada VC.
-            Token yang tidak diklaim akan di-burn permanen.
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.75, maxWidth: 460, marginBottom: 32 }}>
+            100% of supply distributed to the PulseChain community. No team allocation, no VCs, no insiders. Unclaimed tokens are permanently burned.
           </p>
 
-          {/* Stats row */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 36 }}>
+          {/* Stats */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {[
               { label: 'Total Supply', value: '1,000,000,000' },
-              { label: 'Komunitas', value: '100%' },
-              { label: 'Tim / VC', value: '0%' },
-              { label: 'Eligible wallets', value: '48,250' },
+              { label: 'Community', value: '100%' },
+              { label: 'Team / VC', value: '0%' },
+              { label: 'Eligible Wallets', value: '48,250' },
             ].map(s => (
-              <div key={s.label} style={{
-                background: 'var(--bg-card)', border: '1px solid var(--border)',
-                borderRadius: 10, padding: '12px 20px', minWidth: 120,
-              }}>
-                <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: -0.5 }}>{s.value}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
+              <div key={s.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 18px', minWidth: 110 }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: -0.5, lineHeight: 1 }}>{s.value}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6 }}>{s.label}</div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ── Status box / CTA ──────────────────────────────────────────────── */}
-        <div style={{ marginBottom: 32 }}>
+        {/* Claim box */}
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '24px', marginBottom: 36 }}>
           {!connected ? (
-            <div style={{
-              background: 'var(--bg-card)', border: '1px solid var(--border)',
-              borderRadius: 14, padding: '32px 24px', textAlign: 'center',
-            }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
-                Connect wallet untuk cek eligibility
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.6 }}>
-                Sistem akan otomatis cek apakah wallet kamu memenuhi syarat untuk mendapat $PORT369.
-              </div>
-              <button
-                onClick={() => connect({ connector: injected() })}
-                style={{
-                  background: 'var(--accent)', color: '#fff', border: 'none',
-                  borderRadius: 8, padding: '12px 28px',
-                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                  fontFamily: 'Inter, sans-serif',
-                }}
-              >
+            <div style={{ textAlign: 'center', padding: '16px 0' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--bg-subtle)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--text-muted)' }}>{Icon.wallet}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Connect your wallet to check eligibility</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.65 }}>The system will automatically verify your address against all 15 snapshot categories.</div>
+              <button onClick={() => connect({ connector: injected() })} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 28px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
                 Connect Wallet
               </button>
             </div>
           ) : (
-            <div style={{
-              background: 'var(--bg-card)', border: '1px solid var(--border)',
-              borderRadius: 14, padding: '20px 24px',
-            }}>
+            <>
               {statusBox()}
-              {/* Recheck button kalau sudah checking selesai */}
               {(claimStatus === 'eligible' || claimStatus === 'not-eligible') && (
-                <div style={{ marginTop: 12, textAlign: 'right' }}>
-                  <button onClick={checkEligibility}
-                    style={{
-                      background: 'none', border: 'none',
-                      color: 'var(--text-dim)', fontSize: 11,
-                      cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 600,
-                    }}
-                  >
-                    ↻ Recheck
+                <div style={{ marginTop: 10, textAlign: 'right' }}>
+                  <button onClick={checkEligibility} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 11, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>
+                    Recheck
                   </button>
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
 
-        {/* ── How it works ──────────────────────────────────────────────────── */}
+        {/* How it works */}
         <section style={{ marginBottom: 40 }}>
-          <SectionTitle>Cara Kerja</SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+          <SectionTitle>How It Works</SectionTitle>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(158px, 1fr))', gap: 10 }}>
             {[
-              { num: '01', title: 'Snapshot diambil', desc: 'Data on-chain PulseChain dianalisis pada block tertentu' },
-              { num: '02', title: 'Check eligibility', desc: 'Connect wallet — sistem otomatis cek 15 kategori' },
-              { num: '03', title: 'Claim token', desc: 'Approve transaksi — $PORT369 langsung masuk ke wallet' },
-              { num: '04', title: 'Token di-burn', desc: 'Yang tidak diklaim dalam 30 hari di-burn permanen' },
+              { n: '01', title: 'Snapshot taken', desc: 'On-chain PulseChain data analyzed at a specific block height.' },
+              { n: '02', title: 'Check eligibility', desc: 'Connect wallet — system verifies against all 15 categories.' },
+              { n: '03', title: 'Claim tokens', desc: 'Approve the transaction — $PORT369 is sent directly to your wallet.' },
+              { n: '04', title: 'Unclaimed burned', desc: 'Tokens not claimed within 30 days are permanently burned.' },
             ].map(s => (
-              <div key={s.num} style={{
-                background: 'var(--bg-card)', border: '1px solid var(--border)',
-                borderRadius: 10, padding: '16px',
-              }}>
-                <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--accent)', fontFamily: 'monospace', marginBottom: 8, letterSpacing: 1 }}>STEP {s.num}</div>
+              <div key={s.n} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px' }}>
+                <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--accent)', fontFamily: 'monospace', marginBottom: 10, letterSpacing: 1 }}>{s.n}</div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>{s.title}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>{s.desc}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.65 }}>{s.desc}</div>
               </div>
             ))}
           </div>
         </section>
 
-        {/* ── 15 Kategori ───────────────────────────────────────────────────── */}
+        {/* Categories */}
         <section style={{ marginBottom: 40 }}>
-          <SectionTitle>15 Kategori Eligibility</SectionTitle>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
-            Wallet yang masuk lebih banyak kategori mendapat alokasi lebih besar. Semua data diambil dari on-chain PulseChain — transparan dan verifiable.
+          <SectionTitle>Eligibility Criteria — 15 Categories</SectionTitle>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.65 }}>
+            Wallets qualifying for more categories receive a proportionally larger allocation. All data is sourced from on-chain PulseChain records and is publicly verifiable.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 8 }}>
             {CATEGORIES.map((cat, i) => (
-              <div key={i} style={{
-                background: 'var(--bg-card)', border: '1px solid var(--border)',
-                borderRadius: 9, padding: '12px 14px',
-                display: 'flex', alignItems: 'center', gap: 10,
-                transition: 'border-color 0.15s',
-              }}
+              <div key={i} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 9, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10, transition: 'border-color 0.15s' }}
                 onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-hover)')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-              >
-                <span style={{ fontSize: 20, flexShrink: 0 }}>{cat.icon}</span>
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
+                <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--bg-subtle)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-icon)', flexShrink: 0 }}>
+                  <CategoryIcon index={i} />
+                </div>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{cat.label}</div>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{cat.desc}</div>
@@ -595,7 +424,7 @@ export default function ClaimPage() {
           </div>
         </section>
 
-        {/* ── Token details ─────────────────────────────────────────────────── */}
+        {/* Token details */}
         <section style={{ marginBottom: 40 }}>
           <SectionTitle>Token Details</SectionTitle>
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
@@ -604,26 +433,21 @@ export default function ClaimPage() {
               { label: 'Symbol', value: '$PORT369' },
               { label: 'Network', value: 'PulseChain' },
               { label: 'Total Supply', value: '1,000,000,000' },
-              { label: 'Airdrop Allocation', value: '100% (1B tokens)' },
+              { label: 'Airdrop Allocation', value: '100% — 1,000,000,000 tokens' },
               { label: 'Team / VC', value: '0%' },
-              { label: 'Contract Address', value: 'TBA — akan diumumkan saat TGE' },
-              { label: 'Claim Window', value: '30 hari setelah TGE' },
-              { label: 'Unclaimed tokens', value: 'Di-burn permanen setelah deadline' },
+              { label: 'Contract Address', value: 'TBA — announced at TGE', mono: true },
+              { label: 'Claim Window', value: '30 days after TGE' },
+              { label: 'Unclaimed Tokens', value: 'Permanently burned after deadline' },
             ].map((row, i, arr) => (
-              <div key={row.label} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '12px 18px',
-                borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                gap: 12,
-              }}>
+              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none', gap: 12 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>{row.label}</span>
-                <span style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 700, textAlign: 'right', fontFamily: row.label === 'Contract Address' ? 'monospace' : 'inherit' }}>{row.value}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 700, textAlign: 'right', fontFamily: row.mono ? 'monospace' : 'inherit' }}>{row.value}</span>
               </div>
             ))}
           </div>
         </section>
 
-        {/* ── FAQ ───────────────────────────────────────────────────────────── */}
+        {/* FAQ */}
         <section style={{ marginBottom: 40 }}>
           <SectionTitle>FAQ</SectionTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -631,77 +455,28 @@ export default function ClaimPage() {
           </div>
         </section>
 
-        {/* ── Footer CTA ────────────────────────────────────────────────────── */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(110,84,245,0.1) 0%, rgba(110,84,245,0.04) 100%)',
-          border: '1px solid var(--accent-border)',
-          borderRadius: 14, padding: '28px 24px', textAlign: 'center',
-        }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8 }}>
-            Jangan lewatkan window claim
+        {/* CTA */}
+        <div style={{ background: 'linear-gradient(135deg, rgba(110,84,245,0.08) 0%, rgba(110,84,245,0.03) 100%)', border: '1px solid var(--accent-border)', borderRadius: 14, padding: '28px 28px', textAlign: 'center' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: -0.3 }}>Do not miss the claim window</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 22, lineHeight: 1.7 }}>
+            Tokens not claimed within 30 days of TGE are burned permanently. There is no second distribution.
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20, lineHeight: 1.6 }}>
-            Token yang tidak diklaim dalam 30 hari akan di-burn selamanya. Tidak ada second chance.
-          </div>
-          {!connected ? (
-            <button
-              onClick={() => connect({ connector: injected() })}
-              style={{
-                background: 'var(--accent)', color: '#fff', border: 'none',
-                borderRadius: 8, padding: '12px 28px',
-                fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                fontFamily: 'Inter, sans-serif',
-              }}
-            >
-              Connect & Check Eligibility
-            </button>
-          ) : (
-            <a href="/" style={{
-              background: 'var(--bg-card)', color: 'var(--text-muted)',
-              border: '1px solid var(--border)', borderRadius: 8,
-              padding: '12px 24px', fontSize: 13, fontWeight: 600,
-              textDecoration: 'none', display: 'inline-block',
-            }}>
-              ← Kembali ke homepage
-            </a>
-          )}
+          {!connected
+            ? <button onClick={() => connect({ connector: injected() })} style={{ background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 28px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>Connect &amp; Check Eligibility</button>
+            : <a href="/" style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 22px', fontSize: 12, fontWeight: 600, textDecoration: 'none', display: 'inline-block' }}>← Back to homepage</a>
+          }
         </div>
 
         {/* Footer */}
         <div style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 700 }}>Port369</div>
-          <div style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', flex: 1 }}>
-            Selalu verify URL: <strong style={{ color: 'var(--text-dim)' }}>port369.com/claim</strong>
-          </div>
-          <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--text-dim)' }}>
-            <a href="/" style={{ color: 'inherit', textDecoration: 'none' }}>Home</a>
-            <a href="/create" style={{ color: 'inherit', textDecoration: 'none' }}>Create token</a>
+          <span style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 700 }}>Port369</span>
+          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>Always verify: <strong style={{ color: 'var(--text-dim)' }}>port369.com/claim</strong></span>
+          <div style={{ display: 'flex', gap: 16, fontSize: 11 }}>
+            <a href="/" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>Home</a>
+            <a href="/create" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>Create Token</a>
           </div>
         </div>
       </div>
     </main>
-  )
-}
-
-// ─── Util ──────────────────────────────────────────────────────────────────────
-function statusCard(borderColor: string, bg: string, border: string) {
-  return {
-    display: 'flex' as const,
-    alignItems: 'center' as const,
-    gap: 14,
-    padding: '16px 18px',
-    background: bg,
-    border: `1px solid ${border}`,
-    borderRadius: 10,
-    flexWrap: 'wrap' as const,
-  }
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: -0.3, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{ width: 3, height: 14, background: 'var(--accent)', borderRadius: 2 }} />
-      {children}
-    </div>
   )
 }
