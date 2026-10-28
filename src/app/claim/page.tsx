@@ -216,16 +216,18 @@ export default function ClaimPage() {
         <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(23,201,116,0.12)', border: '1px solid rgba(23,201,116,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#17C974', flexShrink: 0 }}>{Icon.check}</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>
-            Eligible — <span style={{ color: '#17C974' }}>{claimAmount} $PORT369</span>
+            Wallet eligible — <span style={{ color: '#17C974' }}>amount TBA</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
             {claimedCategories.length} {claimedCategories.length === 1 ? 'category' : 'categories'} matched: {claimedCategories.map(i => CATEGORIES[i].label).join(', ')}
           </div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+            Claimable amount will be shown once the snapshot is finalized.
+          </div>
         </div>
-        <button onClick={handleClaim} disabled={isTxPending || txConfirming}
-          style={{ background: '#17C974', color: '#000', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: isTxPending || txConfirming ? 0.6 : 1, fontFamily: 'Inter, sans-serif', flexShrink: 0 }}>
-          {isTxPending || txConfirming ? 'Confirming…' : 'Claim'}
-        </button>
+        <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 16px', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+          Claim opens at TGE
+        </div>
       </div>
     )
 
