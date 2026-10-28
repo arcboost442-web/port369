@@ -326,7 +326,7 @@ export default function ClaimPage() {
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '52px 20px 80px', animation: 'fadeUp 0.3s ease' }}>
 
         {/* Hero */}
-        <div style={{ marginBottom: 44 }}>
+        <div style={{ marginBottom: 44, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(23,201,116,0.08)', border: '1px solid rgba(23,201,116,0.2)', borderRadius: 20, padding: '5px 14px', marginBottom: 22, fontSize: 11, fontWeight: 700, color: '#17C974', letterSpacing: 0.3 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#17C974', display: 'inline-block', animation: 'blink 2s infinite' }} />
             CLAIMS OPEN — 29 DAYS REMAINING
@@ -343,14 +343,14 @@ export default function ClaimPage() {
           </p>
 
           {/* Stats */}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
             {[
               { label: 'Total Supply', value: '1,000,000,000' },
               { label: 'Community', value: '100%' },
               { label: 'Team / VC', value: '0%' },
               { label: 'Eligible Wallets', value: 'TBA' },
             ].map(s => (
-              <div key={s.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 18px', minWidth: 110 }}>
+              <div key={s.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 18px', minWidth: 110, textAlign: 'center' }}>
                 <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: -0.5, lineHeight: 1 }}>{s.value}</div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6 }}>{s.label}</div>
               </div>
