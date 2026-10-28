@@ -14,24 +14,20 @@ const CLAIM_ABI = [
 const CATEGORIES = [
   { label: 'Early Burners', desc: 'Burned PLS before snapshot' },
   { label: 'Diamond Hands', desc: 'Held PLS for 6+ months' },
-  { label: 'Whale Wallets', desc: 'Balance ≥ 1M PLS' },
+  { label: 'Whale Wallets', desc: 'Balance ≥ 100M PLS' },
   { label: 'Liquidity Providers', desc: 'PulseX LP for 30+ days' },
   { label: 'Sacrifice Participants', desc: 'Participated in PLS sacrifice phase' },
   { label: 'Builders', desc: 'Deployed contracts on PulseChain' },
   { label: 'DeFi Users', desc: 'More than 50 DeFi transactions' },
   { label: 'Port369 Users', desc: 'Traded via bonding curve' },
-  { label: 'Community Members', desc: 'Active on Discord / Telegram' },
-  { label: 'Governance Voters', desc: 'Voted on PulseChain proposals' },
   { label: 'Bridge Users', desc: 'Bridged ETH → PLS 3+ times' },
   { label: 'OG Holders', desc: 'Held PLS since block < 100k' },
-  { label: 'Ecosystem Supporters', desc: 'Interacted with 10+ protocols' },
-  { label: 'Traders', desc: 'Swap volume > 10k PLS' },
-  { label: 'Stakers', desc: 'Staked PLS for 90+ days' },
+  { label: 'Traders', desc: 'Swap volume > 1M PLS' },
 ]
 
 const FAQ = [
   { q: 'What is $PORT369?', a: '$PORT369 is a fair-launch token on PulseChain with a unique burn mechanism. 100% of the supply is distributed to the community — no team allocation, no VC, no insiders.' },
-  { q: 'How do I claim?', a: 'Connect your PulseChain wallet. The system automatically checks eligibility against 15 snapshot categories. If eligible, the Claim button will activate.' },
+  { q: 'How do I claim?', a: 'Connect your PulseChain wallet. The system automatically checks eligibility against 11 snapshot categories. If eligible, the Claim button will activate.' },
   { q: 'When does the claim window close?', a: 'The claim window is open for 30 days after TGE. Tokens that are not claimed will be permanently burned.' },
   { q: 'How much will I receive?', a: 'The amount depends on which eligibility categories your wallet qualifies for. Wallets that meet more categories receive a larger allocation.' },
   { q: 'Is there a fee to claim?', a: 'There is no claim fee. You only need PLS to cover the on-chain transaction gas cost.' },
@@ -347,7 +343,7 @@ export default function ClaimPage() {
               { label: 'Total Supply', value: '1,000,000,000' },
               { label: 'Community', value: '100%' },
               { label: 'Team / VC', value: '0%' },
-              { label: 'Eligible Wallets', value: '48,250' },
+              { label: 'Eligible Wallets', value: 'TBA' },
             ].map(s => (
               <div key={s.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 18px', minWidth: 110 }}>
                 <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: -0.5, lineHeight: 1 }}>{s.value}</div>
@@ -403,7 +399,7 @@ export default function ClaimPage() {
 
         {/* Categories */}
         <section style={{ marginBottom: 40 }}>
-          <SectionTitle>Eligibility Criteria — 15 Categories</SectionTitle>
+          <SectionTitle>Eligibility Criteria — 11 Categories</SectionTitle>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.65 }}>
             Wallets qualifying for more categories receive a proportionally larger allocation. All data is sourced from on-chain PulseChain records and is publicly verifiable.
           </p>
